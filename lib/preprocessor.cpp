@@ -1768,6 +1768,12 @@ std::string Preprocessor::getcode(const std::string &filedata, const std::string
     while (std::getline(istr, line)) {
         ++lineno;
 
+	// record directive for addons / checkers
+        if ( (line.compare(0, 1, "#") == 0)
+		&& (line.compare(0, 6, "#line ") != 0))
+	    directives.push_back(std::make_tuple(cfg, filenames.top(),
+				 lineno, line));
+
         if (_settings.terminated())
             return "";
 
@@ -1927,6 +1933,7 @@ std::string Preprocessor::getcode(const std::string &filedata, const std::string
                    line.compare(0, 8, "#endfile") == 0 ||
                    line.compare(0, 8, "#define ") == 0 ||
                    line.compare(0, 6, "#line ") == 0 ||
+                   line.compare(0, 9, "#include ") == 0 ||
                    line.compare(0, 6, "#undef") == 0) {
             // We must not remove #file tags or line numbers
             // are corrupted. File tags are removed by the tokenizer.
@@ -1934,8 +1941,10 @@ std::string Preprocessor::getcode(const std::string &filedata, const std::string
             // Keep location info updated
             if (line.compare(0, 7, "#file \"") == 0) {
                 filenames.push(line.substr(7, line.size() - 8));
-                lineNumbers.push(lineno);
+                lineNumbers.push(lineno-1);
                 lineno = 0;
+            } else if (line.compare(0, 6, "#line ") == 0) {
+                --lineno;
             } else if (line.compare(0, 8, "#endfile") == 0) {
                 if (filenames.size() > 1U)
                     filenames.pop();
@@ -2233,6 +2242,7 @@ std::string Preprocessor::handleIncludes(const std::string &code, const std::str
                 }
 
                 ostr << "#file \"" << filename << "\"\n"
+		     << "#line 1\n"
                      << handleIncludes(read(fin, filename), filename, includePaths, defs, pragmaOnce, includes) << std::endl
                      << "#endfile\n";
                 continue;
@@ -2287,8 +2297,8 @@ void Preprocessor::handleIncludes(std::string &code, const std::string &filePath
         std::string::size_type end = code.find('\n', pos);
         std::string filename = code.substr(pos, end - pos);
 
-        // Remove #include clause
-        code.erase(pos, end - pos);
+        // Skip #include line
+        pos = end+1;
 
         HeaderTypes headerType = getHeaderFileName(filename);
         if (headerType == NoHeader)
@@ -2320,7 +2330,7 @@ void Preprocessor::handleIncludes(std::string &code, const std::string &filePath
 
         if (!processedFile.empty()) {
             // Remove space characters that are after or before new line character
-            processedFile = "#file \"" + Path::fromNativeSeparators(filename) + "\"\n" + processedFile + "\n#endfile";
+            processedFile = "#file \"" + Path::fromNativeSeparators(filename) + "\"\n" + "#line 1\n" + processedFile + "\n#endfile\n";
             code.insert(pos, processedFile);
 
             path = filename;
@@ -2956,7 +2966,7 @@ std::string Preprocessor::expandMacros(const std::string &code, std::string file
 
         // Preprocessor directive
         if (line[0] == '#') {
-            // defining a macro..
+	    // defining a macro..
             if (line.compare(0, 8, "#define ") == 0) {
                 PreprocessorMacro *macro = new PreprocessorMacro(line.substr(8), &settings);
                 if (macro->name().empty() || macro->name() == "NULL") {
@@ -3239,9 +3249,10 @@ std::string Preprocessor::expandMacros(const std::string &code, std::string file
         ostr << line;
 
         // update linenr
-        for (std::string::size_type p = 0; p < line.length(); ++p) {
-            if (line[p] == '\n')
-                ++linenr;
+        if (line.compare(0, 8, "#endfile") != 0)
+	    for (std::string::size_type p = 0; p < line.length(); ++p) {
+		if (line[p] == '\n')
+		    ++linenr;
         }
     }
 
@@ -3262,4 +3273,42 @@ void Preprocessor::getErrorMessages(ErrorLogger *errorLogger, const Settings *se
     preprocessor.missingInclude("", 1, "", SystemHeader);
     preprocessor.validateCfgError("X", "X");
     preprocessor.error("", 1, "#error message");   // #error ..
+}
+
+void Preprocessor::dump(std::ostream &out) const
+{
+    // Create a xml directive dump.
+    // The idea is not that this will be readable for humans. It's a
+    // data dump that 3rd party tools could load and get useful info from.
+    // tokens..
+    std::list<std::tuple<std::string, std::string, int, std::string>>::const_iterator it;
+
+    out << "  <directivelist>" << std::endl;
+
+    for (it=directives.begin(); it!=directives.end(); it++) {
+	std::string cfg, filename, directive, direscaped;
+	int linenr;
+	std::tie(cfg, filename, linenr, directive) = *it;
+	/* manually escape the directive for XML compilance */
+	direscaped = "";
+	for (std::string::iterator cp = directive.begin();
+	     cp != directive.end(); ++cp) {
+	    if ((*cp)=='"')
+		direscaped += "&quot;";
+	    else if ((*cp)=='&')
+		direscaped += "&amp;";
+	    else if ((*cp)=='<')
+		direscaped += "&lt;";
+	    else if ((*cp)=='>')
+		direscaped += "&gt;";
+	    else
+		direscaped += *cp;
+	}
+	out << "    <directive "
+	    << "cfg=\"" << cfg << "\" "
+	    << "file=\"" << filename << "\" "
+	    << "linenr=\"" << linenr << "\" "
+	    << "str=\"" << direscaped << "\"/>" << std::endl;
+    }
+    out << "  </directivelist>" << std::endl;
 }

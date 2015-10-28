@@ -40,8 +40,11 @@ static const char ExtraVersion[] = "";
 
 static TimerResults S_timerResults;
 
-CppCheck::CppCheck(ErrorLogger &errorLogger, bool useGlobalSuppressions)
-    : _errorLogger(errorLogger), exitcode(0), _useGlobalSuppressions(useGlobalSuppressions), tooManyConfigs(false), _simplify(true)
+CppCheck::CppCheck(ErrorLogger &errorLogger, bool useGlobalSuppressions) :
+    _errorLogger(errorLogger),
+    preprocessor(_settings, this),
+    exitcode(0), _useGlobalSuppressions(useGlobalSuppressions),
+    tooManyConfigs(false), _simplify(true)
 {
 }
 
@@ -154,7 +157,6 @@ unsigned int CppCheck::processFile(const std::string& filename, std::istream& fi
 
     bool internalErrorFound(false);
     try {
-        Preprocessor preprocessor(_settings, this);
         std::list<std::string> configurations;
         std::string filedata;
 
@@ -289,7 +291,6 @@ void CppCheck::internalError(const std::string &filename, const std::string &msg
 void CppCheck::analyseFile(std::istream &fin, const std::string &filename)
 {
     // Preprocess file..
-    Preprocessor preprocessor(_settings, this);
     std::list<std::string> configurations;
     std::string filedata;
     preprocessor.preprocess(fin, filedata, configurations, filename, _settings._includePaths);
@@ -356,6 +357,7 @@ bool CppCheck::checkFile(const std::string &code, const char FileName[], std::se
             if (fdump.is_open()) {
                 fdump << "<?xml version=\"1.0\"?>" << std::endl;
                 fdump << "<dump cfg=\"" << cfg << "\">" << std::endl;
+		preprocessor.dump(fdump);
                 _tokenizer.dump(fdump);
                 fdump << "</dump>" << std::endl;
             }

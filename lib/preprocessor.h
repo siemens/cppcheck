@@ -26,6 +26,7 @@
 #include <string>
 #include <list>
 #include <set>
+#include <tuple>
 #include "config.h"
 
 class ErrorLogger;
@@ -158,7 +159,7 @@ public:
      * @param errorLogger Error logger to write errors to (if any)
      * @return the expanded string
      */
-    static std::string expandMacros(const std::string &code, std::string filename, const std::string &cfg, ErrorLogger *errorLogger);
+    std::string expandMacros(const std::string &code, std::string filename, const std::string &cfg, ErrorLogger *errorLogger);
 
     /**
      * Remove comments from code. This should only be called from read().
@@ -250,6 +251,9 @@ public:
         file0 = f;
     }
 
+    /* dump all directives */
+    void dump(std::ostream &out) const;
+
 private:
     void missingInclude(const std::string &filename, unsigned int linenr, const std::string &header, HeaderTypes headerType);
 
@@ -270,6 +274,9 @@ private:
 
     Settings& _settings;
     ErrorLogger *_errorLogger;
+
+    /** complete list of (cfg + filename + line number + directive), for addons / checkers */
+    std::list<std::tuple<std::string, std::string, int, std::string>> directives;
 
     /** filename for cpp/c file - useful when reporting errors */
     std::string file0;

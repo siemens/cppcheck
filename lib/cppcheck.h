@@ -25,6 +25,7 @@
 #include "settings.h"
 #include "errorlogger.h"
 #include "check.h"
+#include "preprocessor.h"
 
 #include <string>
 #include <list>
@@ -206,6 +207,8 @@ private:
     virtual void reportInfo(const ErrorLogger::ErrorMessage &msg);
 
     ErrorLogger &_errorLogger;
+
+    Preprocessor preprocessor;
 
     /** @brief Current preprocessor configuration */
     std::string cfg;

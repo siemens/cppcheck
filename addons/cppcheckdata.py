@@ -127,7 +127,6 @@ class Token:
     #
     #     # print LHS operand
     #     print(token.astOperand1.str)
-    # 
     # @endcode
     astOperand1 = None
     astOperand2Id = None
@@ -143,7 +142,6 @@ class Token:
     #
     #     # print RHS operand
     #     print(token.astOperand2.str)
-    # 
     # @endcode
     astOperand2 = None
 
@@ -224,12 +222,34 @@ class Token:
                 return value
         return None
 
+class Directive:
+    ## Directive string
+    str = None
+    ## Next token in tokenlist. For last token, next is None.
+    next = None
+    ## Previous token in tokenlist. For first token, previous is None,
+    previous = None
+    ## configuration name
+    cfg = None
+    ## file name
+    file = None
+    ## line number
+    linenr = None
+
+    def __init__(self, element):
+        self.str = element.get('str')
+        self.next = None
+        self.previous = None
+        self.cfg = element.get('cfg')
+        self.file = element.get('file')
+        self.linenr = element.get('linenr')
+
 ## Scope. Information about global scope, function scopes, class scopes, inner scopes, etc.
 # C++ class: http://cppcheck.sourceforge.net/devinfo/doxyoutput/classScope.html
 class Scope:
     Id = None
     classStartId = None
-    
+
     ## The { Token for this scope
     classStart = None
     classEndId = None
@@ -369,6 +389,7 @@ class ValueFlow:
 # @code
 # data = CppcheckData.parsedump(...)
 # code = ''
+# print(code)
 # for token in data.tokenlist:
 #   code = code + token.str + ' '
 # print(code)
@@ -381,7 +402,17 @@ class ValueFlow:
 #   print('type:' + scope.type + ' name:' + scope.className)
 # @endcode
 #
+# To iterate through all preprocessor directives use such code:
+# @code
+# data = CppcheckData.parsedump(...)
+# for directive in data.directives:
+#   print('cfg:' + directive.cfg + 'file:' + directive.filename
+#         + ' line:' + directive.linenr + ' directive: ', directive)
+# @endcode
+#
 class CppcheckData:
+    ## List of Directive items
+    directivelist = []
     ## List of Token items
     tokenlist = []
     ## List of Scope items
@@ -402,6 +433,17 @@ class CppcheckData:
 
         data = ET.parse(filename)
         for element in data.getroot():
+            if element.tag == 'directivelist':
+                for directive in element:
+                    self.directivelist.append(Directive(directive))
+
+                # set next/previous..
+                prev = None
+                for directive in self.directivelist:
+                    directive.previous = prev
+                    if prev:
+                        prev.next = directive
+                    prev = directive
             if element.tag == 'tokenlist':
                 for token in element:
                     self.tokenlist.append(Token(token))

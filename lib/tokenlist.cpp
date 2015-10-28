@@ -209,7 +209,7 @@ bool TokenList::createTokens(std::istream &code, const std::string& file0)
     appendFileIfNew(file0);
 
     // line number in parsed code
-    unsigned int lineno = 1;
+    unsigned int lineno = 0;
 
     // The current token being parsed
     std::string CurrentToken;
@@ -311,6 +311,15 @@ bool TokenList::createTokens(std::istream &code, const std::string& file0)
             if (CurrentToken == "#file") {
                 // Handle this where strings are handled
                 continue;
+            } else if (CurrentToken == "#include") {
+                // Read to end of line
+                std::string line;
+
+                std::getline(code, line);
+		// Forget this token
+		CurrentToken = "";
+		// keep tokens at correct line numbers
+		++lineno;
             } else if (CurrentToken == "#line") {
                 // Read to end of line
                 std::string line;
@@ -331,8 +340,8 @@ bool TokenList::createTokens(std::istream &code, const std::string& file0)
                         // Update the current file
                         FileIndex = appendFileIfNew(line2);
                     }
-                } else
-                    ++lineno;
+                }/* else
+                    ++lineno*/;
                 CurrentToken.clear();
                 continue;
             } else if (CurrentToken == "#endfile") {
